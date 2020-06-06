@@ -2,9 +2,11 @@
   "name": "authie",
   "version": "0.0.0",
   "description": "A small JavaScript OAuth/OpenID Connect client library",
+  "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "sirv start . --dev"
   },
   "repository": {
     "type": "git",
@@ -37,6 +39,7 @@
   "devDependencies": {
     "husky": "^4.2.5",
     "lint-staged": "^10.2.9",
-    "prettier": "^2.0.5"
+    "prettier": "^2.0.5",
+    "sirv-cli": "^0.4.6"
   }
 }
