@@ -7,8 +7,15 @@
 	</head>
 	<body>
 		<script type="module">
-			import { loginRedirect } from "../src/index.js";
-			loginRedirect();
+			import { loginRedirect } from "../dist/index.js";
+
+			const appConfig = {
+				authority: "https://login.microsoftonline.com/common/v2.0",
+				clientId: "a32f17dc-3dd3-4ca1-be46-1c968c9a0f4e",
+				redirectUri: "http://localhost:500/test",
+			};
+
+			loginRedirect(appConfig);
 		</script>
 	</body>
 </html>

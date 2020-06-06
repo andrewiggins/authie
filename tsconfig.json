@@ -1,0 +1,10 @@
+{
+	"compilerOptions": {
+		"lib": ["DOM", "ES5", "ES2015.Promise"],
+		"module": "ES6",
+		"outDir": "dist",
+		"strict": true,
+		"target": "es5"
+	},
+	"include": ["src/**/*.ts"]
+}
