@@ -23,5 +23,20 @@
   "bugs": {
     "url": "https://github.com/andrewiggins/authie/issues"
   },
-  "homepage": "https://github.com/andrewiggins/authie#readme"
+  "homepage": "https://github.com/andrewiggins/authie#readme",
+  "lint-staged": {
+    "**/*.{js,jsx,ts,tsx,json}": [
+      "prettier --write"
+    ]
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "devDependencies": {
+    "husky": "^4.2.5",
+    "lint-staged": "^10.2.9",
+    "prettier": "^2.0.5"
+  }
 }
