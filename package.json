@@ -1,0 +1,27 @@
+{
+  "name": "authie",
+  "version": "0.0.0",
+  "description": "A small JavaScript OAuth/OpenID Connect client library",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andrewiggins/authie.git"
+  },
+  "keywords": [
+    "oauth",
+    "openid",
+    "authentication",
+    "authorization",
+    "authn",
+    "authz"
+  ],
+  "author": "Andre Wiggins",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/andrewiggins/authie/issues"
+  },
+  "homepage": "https://github.com/andrewiggins/authie#readme"
+}
