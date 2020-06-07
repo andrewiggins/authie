@@ -1,31 +1,69 @@
 import { AppConfig, OpenIdConfiguration, AuthParams } from "./types";
 import { setItem, getItem } from "./storage.js";
 
+export function handleRedirectResponse(appConfig: AppConfig) {
+	if (location.hash.indexOf("code=") !== -1) {
+		const [rawCode, rawStateId] = location.hash.slice(1).split("&");
+		// location.hash = "";
+
+		redeemCode(appConfig, rawCode.split("=")[1], rawStateId.split("=")[1]);
+	}
+
+	// TODO: Handle errors
+}
+
+export function redeemCode(
+	appConfig: AppConfig,
+	code: string,
+	stateId: string,
+	authParams?: AuthParams
+) {
+	const state = readState(stateId);
+	if (!state) {
+		throw new Error(
+			"Auth request received with unrecognized state param: " + stateId
+		);
+	}
+
+	// TODO: Is how scopes passed sufficient? Do auth servers support reusing
+	// tokens to get different access tokens with different scopes? If not, then
+	// we should associate the scopes provided in authorize request with state so
+	// we can get an access_token with the same scopes authorized
+
+	return getOpenIdConfig(appConfig.authority).then((config) => {
+		const authRequest = new FormData();
+		authRequest.append("client_id", appConfig.clientId);
+		authRequest.append("grant_type", "authorization_code");
+		authRequest.append("scope", getScope(authParams));
+		authRequest.append("code", code);
+		authRequest.append("redirect_uri", appConfig.redirectUri);
+		authRequest.append("code_verifier", state?.codeVerifier);
+
+		// TODO: Handle Errors
+		fetch(config.token_endpoint, {
+			method: "POST",
+			body: authRequest,
+		})
+			.then((res) => res.json())
+			.then((res) => console.log(res));
+	});
+}
+
 export function loginRedirect(appConfig: AppConfig, authParams?: AuthParams) {
-	getOpenIdConfig(appConfig.authority).then((config) => {
+	return getOpenIdConfig(appConfig.authority).then((config) => {
 		const state = generateState(authParams?.state);
 		storeState(state);
 
-		generateCodeChallenge(state.codeVerifier).then((codeChallenge) => {
+		return generateCodeChallenge(state.codeVerifier).then((codeChallenge) => {
 			const authRequest = new URL(config.authorization_endpoint);
 			authRequest.searchParams.append("client_id", appConfig.clientId);
 			authRequest.searchParams.append("response_type", "code");
 			authRequest.searchParams.append("redirect_uri", appConfig.redirectUri);
-			authRequest.searchParams.append("response_mode", "query");
+			authRequest.searchParams.append("scope", getScope(authParams));
+			authRequest.searchParams.append("response_mode", "fragment"); // or Fragment
 			authRequest.searchParams.append("state", state.id);
 			authRequest.searchParams.append("code_challenge", codeChallenge);
 			authRequest.searchParams.append("code_challenge_method", "S256");
-
-			let scopes = "";
-			if (authParams && authParams.scopes) {
-				scopes = authParams.scopes.join(" ").toLowerCase();
-			}
-
-			if (scopes.indexOf("openid") == -1) {
-				scopes = "openid " + scopes;
-			}
-
-			authRequest.searchParams.append("scope", scopes);
 
 			if (authParams) {
 				for (let param in authParams.extraParams) {
@@ -54,6 +92,19 @@ function getOpenIdConfig(authority: string): Promise<OpenIdConfiguration> {
 				return config;
 			});
 	}
+}
+
+function getScope(authParams?: AuthParams): string {
+	let scopes = "";
+	if (authParams && authParams.scopes) {
+		scopes = authParams.scopes.join(" ").toLowerCase();
+	}
+
+	if (scopes.indexOf("openid") == -1) {
+		scopes = "openid " + scopes;
+	}
+
+	return scopes;
 }
 
 interface InternalState {
