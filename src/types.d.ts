@@ -1,7 +1,7 @@
 export interface AppConfig {
 	authority: string;
 	clientId: string;
-	redirectUri: string | (() => string);
+	redirectUri: string;
 }
 
 export interface OpenIdConfiguration {
@@ -29,4 +29,12 @@ export interface OpenIdConfiguration {
 	claims_supported?: string[];
 	// false
 	request_uri_parameter_supported: boolean;
+}
+
+export interface AuthParams {
+	scopes?: string[];
+	loginHint?: string;
+	prompt?: string;
+	state?: string;
+	extraParams: Record<string, string>;
 }
