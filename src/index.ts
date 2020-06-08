@@ -1,5 +1,5 @@
 import { AppConfig, OpenIdConfiguration, AuthParams } from "./types";
-import { setItem, getItem } from "./storage.js";
+import { setItem, getItem, removeItem } from "./storage.js";
 
 export function handleRedirectResponse(appConfig: AppConfig) {
 	if (location.hash.indexOf("code=") !== -1) {
@@ -31,49 +31,33 @@ export function redeemCode(
 	// we can get an access_token with the same scopes authorized
 
 	return getOpenIdConfig(appConfig.authority).then((config) => {
-		const authRequest = new FormData();
+		const authRequest = new URLSearchParams();
 		authRequest.append("client_id", appConfig.clientId);
 		authRequest.append("grant_type", "authorization_code");
 		authRequest.append("scope", getScope(authParams));
 		authRequest.append("code", code);
 		authRequest.append("redirect_uri", appConfig.redirectUri);
-		authRequest.append("code_verifier", state?.codeVerifier);
+		authRequest.append("code_verifier", state.codeVerifier);
 
 		// TODO: Handle Errors
 		fetch(config.token_endpoint, {
 			method: "POST",
-			body: authRequest,
+			body: authRequest.toString(),
 		})
 			.then((res) => res.json())
-			.then((res) => console.log(res));
+			.then((res) => console.log(res))
+			.then(() => clearState(state.id));
 	});
 }
 
-export function loginRedirect(appConfig: AppConfig, authParams?: AuthParams) {
-	return getOpenIdConfig(appConfig.authority).then((config) => {
-		const state = generateState(authParams?.state);
-		storeState(state);
-
-		return generateCodeChallenge(state.codeVerifier).then((codeChallenge) => {
-			const authRequest = new URL(config.authorization_endpoint);
-			authRequest.searchParams.append("client_id", appConfig.clientId);
-			authRequest.searchParams.append("response_type", "code");
-			authRequest.searchParams.append("redirect_uri", appConfig.redirectUri);
-			authRequest.searchParams.append("scope", getScope(authParams));
-			authRequest.searchParams.append("response_mode", "fragment"); // or Fragment
-			authRequest.searchParams.append("state", state.id);
-			authRequest.searchParams.append("code_challenge", codeChallenge);
-			authRequest.searchParams.append("code_challenge_method", "S256");
-
-			if (authParams) {
-				for (let param in authParams.extraParams) {
-					authRequest.searchParams.append(param, authParams.extraParams[param]);
-				}
-			}
-
-			console.log(authRequest.toString());
-			location.assign(authRequest.toString());
-		});
+export function loginRedirect(
+	appConfig: AppConfig,
+	authParams?: AuthParams
+): Promise<void> {
+	// Return promise to allow developer to handle errors in generating authorize request
+	return generateAuthorizeRequest(appConfig, authParams).then((authRequest) => {
+		console.log(authRequest.toString());
+		location.assign(authRequest.toString());
 	});
 }
 
@@ -92,6 +76,42 @@ function getOpenIdConfig(authority: string): Promise<OpenIdConfiguration> {
 				return config;
 			});
 	}
+}
+
+function generateAuthorizeRequest(
+	appConfig: AppConfig,
+	authParams?: AuthParams
+): Promise<URL> {
+	const state = generateState(authParams?.state);
+	storeState(state);
+
+	return Promise.all([
+		getOpenIdConfig(appConfig.authority),
+		generateCodeChallenge(state.codeVerifier),
+	])
+		.then(([config, codeChallenge]) => {
+			const authRequest = new URL(config.authorization_endpoint);
+			authRequest.searchParams.append("client_id", appConfig.clientId);
+			authRequest.searchParams.append("response_type", "code");
+			authRequest.searchParams.append("redirect_uri", appConfig.redirectUri);
+			authRequest.searchParams.append("scope", getScope(authParams));
+			authRequest.searchParams.append("response_mode", "fragment"); // or Fragment
+			authRequest.searchParams.append("state", state.id);
+			authRequest.searchParams.append("code_challenge", codeChallenge);
+			authRequest.searchParams.append("code_challenge_method", "S256");
+
+			if (authParams) {
+				for (let param in authParams.extraParams) {
+					authRequest.searchParams.append(param, authParams.extraParams[param]);
+				}
+			}
+
+			return authRequest;
+		})
+		.catch((error) => {
+			clearState(state.id);
+			throw error;
+		});
 }
 
 function getScope(authParams?: AuthParams): string {
@@ -128,6 +148,10 @@ function storeState(state: InternalState): void {
 
 function readState(id: string): InternalState | null {
 	return getItem("state::" + id) as InternalState | null;
+}
+
+function clearState(id: string): void {
+	removeItem("state::" + id);
 }
 
 function base64UrlEncode(binary: string): string {
