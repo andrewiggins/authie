@@ -25,6 +25,8 @@ export function redeemCode(
 		);
 	}
 
+	clearState(state.id);
+
 	// TODO: Is how scopes passed sufficient? Do auth servers support reusing
 	// tokens to get different access tokens with different scopes? If not, then
 	// we should associate the scopes provided in authorize request with state so
@@ -40,13 +42,22 @@ export function redeemCode(
 		authRequest.append("code_verifier", state.codeVerifier);
 
 		// TODO: Handle Errors
+		// TODO: Requires fetch understand URLSearchParams in order to properly
+		// set the content-type of the request
 		fetch(config.token_endpoint, {
 			method: "POST",
-			body: authRequest.toString(),
+			body: authRequest,
 		})
+			.then((res) => {
+				if (res.ok) {
+					return res;
+				} else {
+					throw new Error("Error from token endpoint");
+				}
+			})
 			.then((res) => res.json())
-			.then((res) => console.log(res))
-			.then(() => clearState(state.id));
+			.then((res) => (setItem("token_response", res), res))
+			.then((res) => console.log(res));
 	});
 }
 

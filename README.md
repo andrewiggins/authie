@@ -17,7 +17,7 @@ TODO: Check MDN for polyfills too
 - crypto.getRandomValues
 - String.fromCharCode
 - URL/URLSearchParams
+	- Requires `fetch` also understand URLSearchParams
 - [fetch](https://npm.im/unfetch)
 - [Promise](https://npm.im/promise-polyfill)
 - [TextEncoder](https://www.npmjs.com/package/fast-text-encoding)
-- FormData
