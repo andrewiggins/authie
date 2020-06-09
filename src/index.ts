@@ -120,6 +120,10 @@ function getScope(authParams?: AuthParams): string {
 		scopes = authParams.scopes.join(" ").toLowerCase();
 	}
 
+	if (scopes.indexOf("profile") == -1) {
+		scopes = "profile " + scopes;
+	}
+
 	if (scopes.indexOf("openid") == -1) {
 		scopes = "openid " + scopes;
 	}
