@@ -1,6 +1,7 @@
 import { AppConfig, OpenIdConfiguration, AuthParams } from "./types";
-import { setItem, getItem, removeItem } from "./storage.js";
-import { generateCodeVerifier, generateCodeChallenge } from "./crypto.js";
+import { setItem, getItem } from "./storage.js";
+import { readState, clearState, generateState, storeState } from "./state.js";
+import { sha256 } from "./crypto.js";
 
 export function handleRedirectResponse(appConfig: AppConfig) {
 	if (location.hash.indexOf("code=") !== -1) {
@@ -99,7 +100,7 @@ function generateAuthorizeRequest(
 
 	return Promise.all([
 		getOpenIdConfig(appConfig.authority),
-		generateCodeChallenge(state.codeVerifier),
+		sha256(state.codeVerifier),
 	])
 		.then(([config, codeChallenge]) => {
 			const authRequest = new URL(config.authorization_endpoint);
@@ -141,31 +142,4 @@ function getScope(authParams?: AuthParams): string {
 	}
 
 	return scopes;
-}
-
-interface InternalState {
-	id: string;
-	codeVerifier: string;
-	userState?: string;
-}
-
-function generateState(userState?: string): InternalState {
-	const id = "400fa120-5e9f-411e-94bd-2a23f6695704"; // TODO: Consider using @lukeed/uuid
-	return {
-		id,
-		userState,
-		codeVerifier: generateCodeVerifier(),
-	};
-}
-
-function storeState(state: InternalState): void {
-	setItem("state::" + state.id, state);
-}
-
-function readState(id: string): InternalState | null {
-	return getItem("state::" + id) as InternalState | null;
-}
-
-function clearState(id: string): void {
-	removeItem("state::" + id);
 }

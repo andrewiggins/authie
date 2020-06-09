@@ -13,8 +13,10 @@ A small JavaScript OAuth/OpenID Connect client library
 
 TODO: Check MDN for polyfills too
 
+- Uint8Array
 - [atob/btoa](https://npm.im/Base64)
 - crypto.getRandomValues
+- crypto.subtle.digest
 - String.fromCharCode
 - URL/URLSearchParams
 	- Requires `fetch` also understand URLSearchParams
