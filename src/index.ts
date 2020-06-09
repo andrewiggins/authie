@@ -1,12 +1,17 @@
-import { AppConfig, OpenIdConfiguration, AuthParams } from "./types";
-import { setItem, getItem } from "./storage.js";
+import {
+	AppConfig,
+	OpenIdConfiguration,
+	AuthParams,
+	TokenResponse,
+} from "./types";
+import { setItem, getItem, removeItem } from "./storage.js";
 import { readState, clearState, generateState, storeState } from "./state.js";
 import { sha256 } from "./crypto.js";
 
 export function handleRedirectResponse(appConfig: AppConfig) {
 	if (location.hash.indexOf("code=") !== -1) {
 		const [rawCode, rawStateId] = location.hash.slice(1).split("&");
-		// location.hash = ""; // TODO: Clear hash when not debugging
+		location.hash = "";
 
 		redeemCode(appConfig, rawCode.split("=")[1], rawStateId.split("=")[1]);
 	}
@@ -18,6 +23,11 @@ export function getTokens() {
 	// TODO: Should this be aware if a redeem request is in flight and return a Promise of tokens
 	// in case they are being required?
 	return getItem("tokens");
+}
+
+export function logout() {
+	// TODO: Should we provide an option to issue a logout to the authority?
+	removeItem("tokens");
 }
 
 export function refreshSession(appConfig: AppConfig, authParams?: AuthParams) {
@@ -48,7 +58,7 @@ export function refreshSession(appConfig: AppConfig, authParams?: AuthParams) {
 					throw new Error("Error from token endpoint");
 				}
 			})
-			.then((res) => res.json())
+			.then((res) => res.json() as Promise<TokenResponse>)
 			.then((res) => {
 				setItem("tokens", { ...res, issuedAt: Date.now() });
 				console.log(res);
@@ -100,7 +110,7 @@ export function redeemCode(
 					throw new Error("Error from token endpoint");
 				}
 			})
-			.then((res) => res.json())
+			.then((res) => res.json() as Promise<TokenResponse>)
 			.then((res) => {
 				setItem("tokens", { ...res, issuedAt: Date.now() });
 				console.log(res);

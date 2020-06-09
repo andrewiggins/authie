@@ -13,6 +13,7 @@
 				loginRedirect,
 				getTokens,
 				refreshSession,
+				logout,
 			} from "../dist/index.js";
 
 			const appConfig = {
@@ -26,14 +27,26 @@
 			handleRedirectResponse(appConfig);
 
 			if (getTokens()) {
-				root.innerHTML = `<button id="refresh">Refresh</button>`;
-				document.getElementById("refresh").addEventListener("click", () => {
-					refreshSession(appConfig);
-				});
+				renderLogout();
 			} else {
+				renderLogin();
+			}
+
+			function renderLogin() {
 				root.innerHTML = `<button id="login" type="button">Login</button>`;
 				document.getElementById("login").addEventListener("click", () => {
 					loginRedirect(appConfig);
+				});
+			}
+
+			function renderLogout() {
+				root.innerHTML = `<button id="refresh">Refresh</button><button id="logout">Logout</button>`;
+				document.getElementById("refresh").addEventListener("click", () => {
+					refreshSession(appConfig);
+				});
+				document.getElementById("logout").addEventListener("click", () => {
+					logout();
+					renderLogin();
 				});
 			}
 		</script>
