@@ -6,12 +6,54 @@ import { sha256 } from "./crypto.js";
 export function handleRedirectResponse(appConfig: AppConfig) {
 	if (location.hash.indexOf("code=") !== -1) {
 		const [rawCode, rawStateId] = location.hash.slice(1).split("&");
-		// location.hash = "";
+		// location.hash = ""; // TODO: Clear hash when not debugging
 
 		redeemCode(appConfig, rawCode.split("=")[1], rawStateId.split("=")[1]);
 	}
 
 	// TODO: Handle errors
+}
+
+export function getTokens() {
+	// TODO: Should this be aware if a redeem request is in flight and return a Promise of tokens
+	// in case they are being required?
+	return getItem("tokens");
+}
+
+export function refreshSession(appConfig: AppConfig, authParams?: AuthParams) {
+	const tokenData = getItem("tokens");
+	if (!tokenData) {
+		throw new Error("No token data exist to refresh with");
+	}
+
+	return getOpenIdConfig(appConfig.authority).then((config) => {
+		const authRequest = new URLSearchParams();
+		authRequest.append("client_id", appConfig.clientId);
+		authRequest.append("grant_type", "refresh_token");
+		authRequest.append("scope", getScope(authParams));
+		authRequest.append("refresh_token", tokenData.refresh_token);
+		applyExtraParams(authRequest, authParams);
+
+		// TODO: Handle Errors
+		// TODO: Requires fetch understand URLSearchParams in order to properly
+		// set the content-type of the request
+		return fetch(config.token_endpoint, {
+			method: "POST",
+			body: authRequest,
+		})
+			.then((res) => {
+				if (res.ok) {
+					return res;
+				} else {
+					throw new Error("Error from token endpoint");
+				}
+			})
+			.then((res) => res.json())
+			.then((res) => {
+				setItem("tokens", { ...res, issuedAt: Date.now() });
+				console.log(res);
+			});
+	});
 }
 
 export function redeemCode(
@@ -42,11 +84,12 @@ export function redeemCode(
 		authRequest.append("code", code);
 		authRequest.append("redirect_uri", appConfig.redirectUri);
 		authRequest.append("code_verifier", state.codeVerifier);
+		applyExtraParams(authRequest, authParams);
 
 		// TODO: Handle Errors
 		// TODO: Requires fetch understand URLSearchParams in order to properly
 		// set the content-type of the request
-		fetch(config.token_endpoint, {
+		return fetch(config.token_endpoint, {
 			method: "POST",
 			body: authRequest,
 		})
@@ -58,8 +101,10 @@ export function redeemCode(
 				}
 			})
 			.then((res) => res.json())
-			.then((res) => (setItem("token_response", res), res))
-			.then((res) => console.log(res));
+			.then((res) => {
+				setItem("tokens", { ...res, issuedAt: Date.now() });
+				console.log(res);
+			});
 	});
 }
 
@@ -76,7 +121,7 @@ export function loginRedirect(
 
 const openIdConfigPath = "/.well-known/openid-configuration";
 function getOpenIdConfig(authority: string): Promise<OpenIdConfiguration> {
-	const key = authority + "::openid-config";
+	const key = "openid-config::" + authority;
 
 	let c;
 	if ((c = getItem(key)) !== null) {
@@ -112,12 +157,7 @@ function generateAuthorizeRequest(
 			authRequest.searchParams.append("state", state.id);
 			authRequest.searchParams.append("code_challenge", codeChallenge);
 			authRequest.searchParams.append("code_challenge_method", "S256");
-
-			if (authParams) {
-				for (let param in authParams.extraParams) {
-					authRequest.searchParams.append(param, authParams.extraParams[param]);
-				}
-			}
+			applyExtraParams(authRequest.searchParams, authParams);
 
 			return authRequest;
 		})
@@ -142,4 +182,15 @@ function getScope(authParams?: AuthParams): string {
 	}
 
 	return scopes;
+}
+
+function applyExtraParams(
+	request: URLSearchParams,
+	authParams?: AuthParams
+): void {
+	if (authParams) {
+		for (let param in authParams.extraParams) {
+			request.append(param, authParams.extraParams[param]);
+		}
+	}
 }

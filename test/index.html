@@ -8,7 +8,12 @@
 	<body>
 		<div id="root"></div>
 		<script type="module">
-			import { handleRedirectResponse, loginRedirect } from "../dist/index.js";
+			import {
+				handleRedirectResponse,
+				loginRedirect,
+				getTokens,
+				refreshSession,
+			} from "../dist/index.js";
 
 			const appConfig = {
 				authority: "https://login.microsoftonline.com/common/v2.0",
@@ -20,10 +25,17 @@
 
 			handleRedirectResponse(appConfig);
 
-			root.innerHTML = `<button id="login" type="button">Login</button>`;
-			document.getElementById("login").addEventListener("click", () => {
-				loginRedirect(appConfig);
-			});
+			if (getTokens()) {
+				root.innerHTML = `<button id="refresh">Refresh</button>`;
+				document.getElementById("refresh").addEventListener("click", () => {
+					refreshSession(appConfig);
+				});
+			} else {
+				root.innerHTML = `<button id="login" type="button">Login</button>`;
+				document.getElementById("login").addEventListener("click", () => {
+					loginRedirect(appConfig);
+				});
+			}
 		</script>
 	</body>
 </html>
