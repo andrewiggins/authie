@@ -5,18 +5,36 @@ import {
 	TokenResponse,
 } from "./types";
 import { setItem, getItem, removeItem } from "./storage.js";
-import { readState, clearState, generateState, storeState } from "./state.js";
+import {
+	readState,
+	clearState,
+	generateAuthorizeState,
+	storeState,
+} from "./state.js";
 import { sha256 } from "./crypto.js";
 
 export function handleRedirectResponse(appConfig: AppConfig) {
 	if (location.hash.indexOf("code=") !== -1) {
-		const [rawCode, rawStateId] = location.hash.slice(1).split("&");
-		location.hash = "";
+		const params = new URLSearchParams(location.hash.slice(1));
+		// location.hash = ""; // TODO: Clear hash when not debugging
 
-		redeemCode(appConfig, rawCode.split("=")[1], rawStateId.split("=")[1]);
+		const stateId = params.get("state");
+		if (!stateId) {
+			throw new Error(
+				`Redirect response does not contain the required state parameter`
+			);
+		}
+
+		const returnUrl = readState(stateId)?.returnUrl;
+		redeemCode(appConfig, params).then(() => {
+			if (returnUrl) {
+				location.replace(returnUrl);
+			}
+		});
 	}
 
-	// TODO: Handle errors
+	// TODO: Handle errors: https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-auth-code-flow#error-response
+	// error=access_denied&error_subcode=cancel&state=3596ba7a-1425-4173-9977-f2151a142316
 }
 
 export function getTokens() {
@@ -68,10 +86,24 @@ export function refreshSession(appConfig: AppConfig, authParams?: AuthParams) {
 
 export function redeemCode(
 	appConfig: AppConfig,
-	code: string,
-	stateId: string,
+	authorizeResponse: URLSearchParams,
 	authParams?: AuthParams
 ) {
+	const code = authorizeResponse.get("code");
+	const stateId = authorizeResponse.get("state");
+
+	if (!code) {
+		throw new Error(
+			`Authorize response does not contain the required code parameter`
+		);
+	}
+
+	if (!stateId) {
+		throw new Error(
+			`Authorize response does not contain the required state parameter`
+		);
+	}
+
 	const state = readState(stateId);
 	if (!state) {
 		throw new Error(
@@ -112,6 +144,9 @@ export function redeemCode(
 			})
 			.then((res) => res.json() as Promise<TokenResponse>)
 			.then((res) => {
+				// TODO: Verify ID token signature?
+				// TODO: Handle errors https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-auth-code-flow#error-response-1
+
 				setItem("tokens", { ...res, issuedAt: Date.now() });
 				console.log(res);
 			});
@@ -150,7 +185,11 @@ function generateAuthorizeRequest(
 	appConfig: AppConfig,
 	authParams?: AuthParams
 ): Promise<URL> {
-	const state = generateState(authParams?.state);
+	const state = generateAuthorizeState(
+		appConfig.redirectUri,
+		authParams?.state
+	);
+
 	storeState(state);
 
 	return Promise.all([
@@ -159,14 +198,16 @@ function generateAuthorizeRequest(
 	])
 		.then(([config, codeChallenge]) => {
 			const authRequest = new URL(config.authorization_endpoint);
-			authRequest.searchParams.append("client_id", appConfig.clientId);
-			authRequest.searchParams.append("response_type", "code");
-			authRequest.searchParams.append("redirect_uri", appConfig.redirectUri);
-			authRequest.searchParams.append("scope", getScope(authParams));
-			authRequest.searchParams.append("response_mode", "fragment"); // or Fragment
-			authRequest.searchParams.append("state", state.id);
-			authRequest.searchParams.append("code_challenge", codeChallenge);
-			authRequest.searchParams.append("code_challenge_method", "S256");
+			const params = authRequest.searchParams;
+			params.append("client_id", appConfig.clientId);
+			params.append("response_type", "code");
+			params.append("redirect_uri", appConfig.redirectUri);
+			params.append("scope", getScope(authParams));
+			params.append("response_mode", "fragment"); // or Fragment
+			params.append("state", state.id);
+			params.append("code_challenge", codeChallenge);
+			params.append("code_challenge_method", "S256");
+			params.append("client_info", "1");
 			applyExtraParams(authRequest.searchParams, authParams);
 
 			return authRequest;
@@ -199,6 +240,14 @@ function applyExtraParams(
 	authParams?: AuthParams
 ): void {
 	if (authParams) {
+		if (authParams.loginHint) {
+			request.append("login_hint", authParams.loginHint);
+		}
+
+		if (authParams.prompt) {
+			request.append("prompt", authParams.prompt);
+		}
+
 		for (let param in authParams.extraParams) {
 			request.append(param, authParams.extraParams[param]);
 		}

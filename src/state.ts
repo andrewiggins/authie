@@ -5,19 +5,31 @@ interface InternalState {
 	id: string;
 	codeVerifier: string;
 	userState?: string;
+	returnUrl?: string;
 }
 
 const UUID_SIZE = 16;
 const VERIFIER_SIZE = 64;
 
-export function generateState(userState?: string): InternalState {
+export function generateAuthorizeState(
+	redirectUri: string,
+	userState?: string
+): InternalState {
 	const bytes = new Uint8Array(UUID_SIZE + VERIFIER_SIZE);
 	crypto.getRandomValues(bytes);
 
+	let returnUrl: string | undefined;
+	if (redirectUri !== location.href) {
+		// If the redirectUri that will receive the tokens is different than the
+		// current page, set up the system to return the user back to this page
+		returnUrl = location.href;
+	}
+
 	return {
 		id: uuid(bytes.subarray(0, UUID_SIZE)),
-		userState,
 		codeVerifier: base64UrlEncode(bytes.subarray(UUID_SIZE)),
+		userState,
+		returnUrl,
 	};
 }
 
