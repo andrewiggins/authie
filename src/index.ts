@@ -13,6 +13,8 @@ import {
 } from "./state.js";
 import { sha256 } from "./crypto.js";
 
+// TODO: Migrate updates made to custom-pkcev2 in aad-playground repo: https://github.com/andrewiggins/aad-playground
+
 export function handleRedirectResponse(appConfig: AppConfig) {
 	if (location.hash.indexOf("code=") !== -1) {
 		const params = new URLSearchParams(location.hash.slice(1));
